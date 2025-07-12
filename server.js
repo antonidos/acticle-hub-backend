@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const { specs, swaggerUi } = require('./config/swagger');
 require('dotenv').config();
 
 const app = express();
@@ -29,12 +30,47 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Статические файлы
 app.use('/uploads', express.static('uploads'));
 
+// Swagger UI
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'ArticleHub API Documentation'
+}));
+
 // Основные маршруты
+/**
+ * @swagger
+ * /:
+ *   get:
+ *     summary: Главная страница API
+ *     tags: [General]
+ *     responses:
+ *       200:
+ *         description: Информация о API
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "ArticleHub Backend API"
+ *                 version:
+ *                   type: string
+ *                   example: "1.0.0"
+ *                 status:
+ *                   type: string
+ *                   example: "running"
+ *                 documentation:
+ *                   type: string
+ *                   example: "/api-docs"
+ */
 app.get('/', (req, res) => {
   res.json({ 
     message: 'ArticleHub Backend API',
     version: '1.0.0',
-    status: 'running'
+    status: 'running',
+    documentation: '/api-docs'
   });
 });
 
