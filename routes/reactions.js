@@ -62,7 +62,7 @@ router.get('/', async (req, res) => {
  *     summary: Добавление реакции к статье
  *     tags: [Reactions]
  *     security:
- *       - bearerAuth: []
+ *       - authorization: []
  *     parameters:
  *       - in: path
  *         name: articleId

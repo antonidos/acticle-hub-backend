@@ -179,7 +179,7 @@ router.get('/article/:articleId', optionalAuth, async (req, res) => {
  *     summary: Добавление комментария к статье
  *     tags: [Comments]
  *     security:
- *       - bearerAuth: []
+ *       - authorization: []
  *     parameters:
  *       - in: path
  *         name: articleId

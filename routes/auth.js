@@ -190,7 +190,7 @@ router.post('/login', validate(userSchemas.login), async (req, res) => {
  *     summary: Получение данных текущего пользователя
  *     tags: [Authentication]
  *     security:
- *       - bearerAuth: []
+ *       - authorization: []
  *     responses:
  *       200:
  *         description: Данные пользователя получены успешно
@@ -260,7 +260,7 @@ router.get('/me', authenticateToken, async (req, res) => {
  *     summary: Проверка действительности JWT токена
  *     tags: [Authentication]
  *     security:
- *       - bearerAuth: []
+ *       - authorization: []
  *     responses:
  *       200:
  *         description: Токен действителен

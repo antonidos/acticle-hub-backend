@@ -15,7 +15,7 @@ const router = express.Router();
  *     summary: Получение профиля текущего пользователя
  *     tags: [Users]
  *     security:
- *       - bearerAuth: []
+ *       - authorization: []
  *     responses:
  *       200:
  *         description: Профиль пользователя получен успешно
@@ -132,7 +132,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
  *     summary: Обновление профиля пользователя
  *     tags: [Users]
  *     security:
- *       - bearerAuth: []
+ *       - authorization: []
  *     requestBody:
  *       required: true
  *       content:
@@ -244,7 +244,78 @@ router.put('/profile', authenticateToken, validate(userSchemas.updateProfile), a
   }
 });
 
-// Загрузка аватара
+/**
+ * @swagger
+ * /api/users/avatar:
+ *   post:
+ *     summary: Загрузка аватара пользователя
+ *     tags: [Users]
+ *     security:
+ *       - authorization: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *                 description: Файл аватара (JPG, PNG, GIF, максимум 5MB)
+ *             required:
+ *               - avatar
+ *     responses:
+ *       200:
+ *         description: Аватар успешно загружен
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Аватар успешно загружен"
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       description: ID пользователя
+ *                     username:
+ *                       type: string
+ *                       description: Имя пользователя
+ *                     email:
+ *                       type: string
+ *                       format: email
+ *                       description: Email пользователя
+ *                     avatar_url:
+ *                       type: string
+ *                       format: uri
+ *                       description: URL аватара
+ *                     updated_at:
+ *                       type: string
+ *                       format: date-time
+ *                       description: Дата последнего обновления
+ *       400:
+ *         description: Файл не загружен или неверный формат
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Неавторизован
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Внутренняя ошибка сервера
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.post('/avatar', authenticateToken, uploadAvatar, handleUploadError, async (req, res) => {
   try {
     if (!req.file) {
@@ -296,7 +367,44 @@ router.post('/avatar', authenticateToken, uploadAvatar, handleUploadError, async
   }
 });
 
-// Удаление аватара
+/**
+ * @swagger
+ * /api/users/avatar:
+ *   delete:
+ *     summary: Удаление аватара пользователя
+ *     tags: [Users]
+ *     security:
+ *       - authorization: []
+ *     responses:
+ *       200:
+ *         description: Аватар успешно удален
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Аватар успешно удален"
+ *       404:
+ *         description: Аватар не найден
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Неавторизован
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Внутренняя ошибка сервера
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.delete('/avatar', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -337,7 +445,74 @@ router.delete('/avatar', authenticateToken, async (req, res) => {
   }
 });
 
-// Получение публичного профиля пользователя (по ID)
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   get:
+ *     summary: Получение профиля пользователя по ID
+ *     tags: [Users]
+ *     security:
+ *       - authorization: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID пользователя
+ *     responses:
+ *       200:
+ *         description: Профиль пользователя получен успешно
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       description: ID пользователя
+ *                     username:
+ *                       type: string
+ *                       description: Имя пользователя
+ *                     avatar_url:
+ *                       type: string
+ *                       format: uri
+ *                       description: URL аватара
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *                       description: Дата создания аккаунта
+ *                     statistics:
+ *                       type: object
+ *                       properties:
+ *                         articles_count:
+ *                           type: integer
+ *                           description: Количество статей пользователя
+ *                         comments_count:
+ *                           type: integer
+ *                           description: Количество комментариев пользователя
+ *       404:
+ *         description: Пользователь не найден
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Неавторизован
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Внутренняя ошибка сервера
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.get('/:id', async (req, res) => {
   try {
     const userId = req.params.id;
