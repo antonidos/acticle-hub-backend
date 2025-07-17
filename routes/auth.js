@@ -185,76 +185,6 @@ router.post('/login', validate(userSchemas.login), async (req, res) => {
 
 /**
  * @swagger
- * /api/auth/me:
- *   get:
- *     summary: Получение данных текущего пользователя
- *     tags: [Authentication]
- *     security:
- *       - authorization: []
- *     responses:
- *       200:
- *         description: Данные пользователя получены успешно
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 user:
- *                   $ref: '#/components/schemas/User'
- *       401:
- *         description: Неавторизован
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       404:
- *         description: Пользователь не найден
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       500:
- *         description: Внутренняя ошибка сервера
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-router.get('/me', authenticateToken, async (req, res) => {
-  try {
-    // Получаем полные данные пользователя
-    const userQuery = `
-      SELECT id, username, email, avatar_url, created_at, updated_at 
-      FROM users 
-      WHERE id = $1
-    `;
-    const userResult = await db.query(userQuery, [req.user.id]);
-
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Пользователь не найден' });
-    }
-
-    const user = userResult.rows[0];
-
-    res.json({
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        avatar_url: user.avatar_url,
-        created_at: user.created_at,
-        updated_at: user.updated_at
-      }
-    });
-
-  } catch (error) {
-    console.error('Ошибка получения данных пользователя:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
-  }
-});
-
-/**
- * @swagger
  * /api/auth/verify-token:
  *   post:
  *     summary: Проверка действительности JWT токена
@@ -272,12 +202,9 @@ router.get('/me', authenticateToken, async (req, res) => {
  *                 message:
  *                   type: string
  *                   example: "Токен действителен"
- *                 user:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: integer
- *                       description: ID пользователя
+ *                 userId:
+ *                   type: integer
+ *                   description: ID пользователя
  *       401:
  *         description: Неавторизован или токен недействителен
  *         content:
@@ -288,7 +215,7 @@ router.get('/me', authenticateToken, async (req, res) => {
 router.post('/verify-token', authenticateToken, (req, res) => {
   res.json({ 
     message: 'Токен действителен',
-    user: req.user 
+    userId: req.user.id 
   });
 });
 

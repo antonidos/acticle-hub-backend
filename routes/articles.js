@@ -514,7 +514,66 @@ router.put('/:id', authenticateToken, checkAuthor('article'), validate(articleSc
   }
 });
 
-// Удаление статьи
+/**
+ * @swagger
+ * /api/articles/{id}:
+ *   delete:
+ *     summary: Удаление статьи по ID
+ *     tags: [Articles]
+ *     security:
+ *       - authorization: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID статьи
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: Заголовок статьи
+ *               content:
+ *                 type: string
+ *                 description: Содержание статьи
+ *     responses:
+ *       201:
+ *         description: Статья успешно создана
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Статья успешно создана"
+ *                 article:
+ *                   $ref: '#/components/schemas/Article'
+ *       400:
+ *         description: Ошибка валидации данных
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Неавторизован
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Внутренняя ошибка сервера
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.delete('/:id', authenticateToken, checkAuthor('article'), async (req, res) => {
   try {
     const articleId = req.params.id;

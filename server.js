@@ -80,6 +80,7 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/articles', require('./routes/articles'));
 app.use('/api/comments', require('./routes/comments'));
 app.use('/api/reactions', require('./routes/reactions'));
+app.use('/api/profile', require('./routes/profile'));
 
 // Обработка 404
 app.use('*', (req, res) => {
