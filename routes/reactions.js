@@ -5,41 +5,6 @@ const { validate, reactionSchemas } = require('../middleware/validation');
 
 const router = express.Router();
 
-/**
- * @swagger
- * /api/reactions:
- *   get:
- *     summary: Получение всех доступных реакций
- *     tags: [Reactions]
- *     responses:
- *       200:
- *         description: Список доступных реакций
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 reactions:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                         description: ID реакции
- *                       emoji:
- *                         type: string
- *                         description: Эмодзи реакции
- *                       name:
- *                         type: string
- *                         description: Название реакции
- *       500:
- *         description: Внутренняя ошибка сервера
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
 router.get('/', async (req, res) => {
   try {
     const reactionsQuery = 'SELECT id, emoji, name FROM reactions ORDER BY id';
@@ -94,24 +59,6 @@ router.get('/', async (req, res) => {
  *                 message:
  *                   type: string
  *                   example: "Реакция успешно добавлена"
- *                 reaction:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: integer
- *                     article_id:
- *                       type: integer
- *                     user_id:
- *                       type: integer
- *                     reaction_id:
- *                       type: integer
- *                     emoji:
- *                       type: string
- *                     name:
- *                       type: string
- *                     created_at:
- *                       type: string
- *                       format: date-time
  *       400:
  *         description: Вы уже поставили эту реакцию
  *         content:
@@ -288,62 +235,6 @@ router.delete('/article/:articleId', authenticateToken, validate(reactionSchemas
   }
 });
 
-/**
- * @swagger
- * /api/reactions/article/{articleId}:
- *   get:
- *     summary: Получение реакций статьи
- *     tags: [Reactions]
- *     parameters:
- *       - in: path
- *         name: articleId
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID статьи
- *     responses:
- *       200:
- *         description: Список реакций статьи
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 reactions:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                         description: ID реакции
- *                       emoji:
- *                         type: string
- *                         description: Эмодзи реакции
- *                       name:
- *                         type: string
- *                         description: Название реакции
- *                       count:
- *                         type: integer
- *                         description: Количество этих реакций
- *                       users:
- *                         type: array
- *                         items:
- *                           type: string
- *                         description: Пользователи, поставившие эту реакцию
- *       404:
- *         description: Статья не найдена
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       500:
- *         description: Внутренняя ошибка сервера
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
 router.get('/article/:articleId', async (req, res) => {
   try {
     const articleId = req.params.articleId;

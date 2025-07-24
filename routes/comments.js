@@ -275,75 +275,71 @@ router.post('/article/:articleId', authenticateToken, validate(commentSchemas.cr
   }
 });
 
-// Получение конкретного комментария
-router.get('/:id', optionalAuth, async (req, res) => {
-  try {
-    const commentId = req.params.id;
-    
-    const commentQuery = `
-      SELECT 
-        c.id,
-        c.content,
-        c.article_id,
-        c.author_id,
-        c.created_at,
-        c.updated_at,
-        u.username as author_username,
-        u.avatar_url as author_avatar,
-        COUNT(DISTINCT cr.id) as reactions_count
-      FROM comments c
-      JOIN users u ON c.author_id = u.id
-      LEFT JOIN comment_reactions cr ON c.id = cr.comment_id
-      WHERE c.id = $1
-      GROUP BY c.id, c.content, c.article_id, c.author_id, c.created_at, c.updated_at, u.username, u.avatar_url
-    `;
-    
-    const commentResult = await db.query(commentQuery, [commentId]);
-    
-    if (commentResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Комментарий не найден' });
-    }
-    
-    const comment = commentResult.rows[0];
-    
-    // Получаем реакции для комментария
-    const reactionsQuery = `
-      SELECT 
-        r.id,
-        r.emoji,
-        r.name,
-        COUNT(cr.id) as count,
-        ${req.user ? 'MAX(CASE WHEN cr.user_id = $1 THEN 1 ELSE 0 END) as user_reacted' : '0 as user_reacted'}
-      FROM reactions r
-      LEFT JOIN comment_reactions cr ON r.id = cr.reaction_id AND cr.comment_id = $${req.user ? 2 : 1}
-      GROUP BY r.id, r.emoji, r.name
-      ORDER BY r.id
-    `;
-    
-    const reactionsParams = req.user ? [req.user.id, commentId] : [commentId];
-    const reactionsResult = await db.query(reactionsQuery, reactionsParams);
-    
-    res.json({
-      comment: {
-        ...comment,
-        reactions_count: parseInt(comment.reactions_count),
-        reactions: reactionsResult.rows.map(r => ({
-          id: r.id,
-          emoji: r.emoji,
-          name: r.name,
-          count: parseInt(r.count),
-          user_reacted: Boolean(parseInt(r.user_reacted))
-        }))
-      }
-    });
-    
-  } catch (error) {
-    console.error('Ошибка получения комментария:', error);
-    res.status(500).json({ message: 'Ошибка сервера' });
-  }
-});
-
-// Редактирование комментария
+/**
+ * @swagger
+ * /api/comments/{id}:
+ *   put:
+ *     summary: Редактирование комментария
+ *     tags: [Comments]
+ *     security:
+ *       - authorization: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID комментария
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CommentRequest'
+ *     responses:
+ *       200:
+ *         description: Комментарий успешно обновлен
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Комментарий успешно обновлен"
+ *                 comment:
+ *                   $ref: '#/components/schemas/Comment'
+ *       400:
+ *         description: Ошибка валидации данных
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Неавторизован
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Нет прав для редактирования комментария
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Комментарий не найден
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Внутренняя ошибка сервера
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.put('/:id', authenticateToken, checkAuthor('comment'), validate(commentSchemas.update), async (req, res) => {
   try {
     const commentId = req.params.id;
@@ -378,7 +374,63 @@ router.put('/:id', authenticateToken, checkAuthor('comment'), validate(commentSc
   }
 });
 
-// Удаление комментария
+/**
+ * @swagger
+ * /api/comments/{id}:
+ *   delete:
+ *     summary: Удаление комментария
+ *     tags: [Comments]
+ *     security:
+ *       - authorization: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID комментария
+ *     responses:
+ *       200:
+ *         description: Комментарий успешно удален
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Комментарий успешно удален"
+ *                 deletedComment:
+ *                   type: object
+ *                   properties:
+ *                     content:
+ *                       type: string
+ *                       description: Содержимое удаленного комментария
+ *       401:
+ *         description: Неавторизован
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Нет прав для удаления комментария
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Комментарий не найден
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Внутренняя ошибка сервера
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.delete('/:id', authenticateToken, checkAuthor('comment'), async (req, res) => {
   try {
     const commentId = req.params.id;
