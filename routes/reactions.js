@@ -59,7 +59,8 @@ router.get('/', async (req, res) => {
  * @swagger
  * /api/reactions/article/{articleId}:
  *   post:
- *     summary: Добавление реакции к статье
+ *     summary: Добавление или изменение реакции к статье
+ *     description: Пользователь может иметь только одну реакцию на статью. При установке новой реакции предыдущая автоматически удаляется.
  *     tags: [Reactions]
  *     security:
  *       - authorization: []
@@ -84,7 +85,7 @@ router.get('/', async (req, res) => {
  *                 description: ID реакции
  *     responses:
  *       201:
- *         description: Реакция успешно добавлена
+ *         description: Реакция успешно добавлена или изменена
  *         content:
  *           application/json:
  *             schema:
@@ -154,17 +155,26 @@ router.post('/article/:articleId', authenticateToken, validate(reactionSchemas.c
       return res.status(404).json({ message: 'Реакция не найдена' });
     }
     
-    // Проверяем, нет ли уже такой реакции от этого пользователя
+    // Проверяем, есть ли уже реакция от этого пользователя на эту статью
     const existingReaction = await db.query(
-      'SELECT id FROM article_reactions WHERE article_id = $1 AND user_id = $2 AND reaction_id = $3',
-      [articleId, userId, reaction_id]
+      'SELECT id, reaction_id FROM article_reactions WHERE article_id = $1 AND user_id = $2',
+      [articleId, userId]
     );
     
-    if (existingReaction.rows.length > 0) {
+    // Если пользователь уже поставил эту же реакцию, возвращаем ошибку
+    if (existingReaction.rows.length > 0 && existingReaction.rows[0].reaction_id == reaction_id) {
       return res.status(400).json({ message: 'Вы уже поставили эту реакцию' });
     }
     
-    // Добавляем реакцию
+    // Если есть другая реакция от этого пользователя, удаляем её
+    if (existingReaction.rows.length > 0) {
+      await db.query(
+        'DELETE FROM article_reactions WHERE article_id = $1 AND user_id = $2',
+        [articleId, userId]
+      );
+    }
+    
+    // Добавляем новую реакцию
     const insertQuery = `
       INSERT INTO article_reactions (article_id, user_id, reaction_id)
       VALUES ($1, $2, $3)
@@ -175,7 +185,7 @@ router.post('/article/:articleId', authenticateToken, validate(reactionSchemas.c
     const reaction = reactionExists.rows[0];
     
     res.status(201).json({
-      message: 'Реакция успешно добавлена',
+      message: existingReaction.rows.length > 0 ? 'Реакция успешно изменена' : 'Реакция успешно добавлена',
       reaction: {
         id: result.rows[0].id,
         article_id: parseInt(articleId),
@@ -193,11 +203,60 @@ router.post('/article/:articleId', authenticateToken, validate(reactionSchemas.c
   }
 });
 
-// Удаление реакции со статьи
+/**
+ * @swagger
+ * /api/reactions/article/{articleId}:
+ *   delete:
+ *     summary: Удаление реакции к статье
+ *     tags: [Reactions]
+ *     security:
+ *       - authorization: []
+ *     parameters:
+ *       - in: path
+ *         name: articleId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID статьи
+ *     responses:
+ *       201:
+ *         description: Реакция успешно удалена
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Реакция успешно удалена"
+ *       400:
+ *         description: Вы не поставили реакцию на эту статью
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Неавторизован
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Статья или реакция не найдена
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Внутренняя ошибка сервера
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.delete('/article/:articleId', authenticateToken, validate(reactionSchemas.create), async (req, res) => {
   try {
     const articleId = req.params.articleId;
-    const { reaction_id } = req.body;
     const userId = req.user.id;
     
     // Проверяем, существует ли статья
@@ -209,11 +268,11 @@ router.delete('/article/:articleId', authenticateToken, validate(reactionSchemas
     // Удаляем реакцию
     const deleteQuery = `
       DELETE FROM article_reactions 
-      WHERE article_id = $1 AND user_id = $2 AND reaction_id = $3
+      WHERE article_id = $1 AND user_id = $2
       RETURNING id
     `;
     
-    const result = await db.query(deleteQuery, [articleId, userId, reaction_id]);
+    const result = await db.query(deleteQuery, [articleId, userId]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Реакция не найдена' });
@@ -327,7 +386,88 @@ router.get('/article/:articleId', async (req, res) => {
   }
 });
 
-// Добавление реакции к комментарию
+/**
+ * @swagger
+ * /api/reactions/comment/{commentId}:
+ *   post:
+ *     summary: Добавление или изменение реакции к комментарию
+ *     description: Пользователь может иметь только одну реакцию на комментарий. При установке новой реакции предыдущая автоматически удаляется.
+ *     tags: [Reactions]
+ *     security:
+ *       - authorization: []
+ *     parameters:
+ *       - in: path
+ *         name: commentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID комментария
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reaction_id
+ *             properties:
+ *               reaction_id:
+ *                 type: integer
+ *                 description: ID реакции
+ *     responses:
+ *       201:
+ *         description: Реакция успешно добавлена или изменена
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Реакция успешно добавлена"
+ *                 reaction:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     comment_id:
+ *                       type: integer
+ *                     user_id:
+ *                       type: integer
+ *                     reaction_id:
+ *                       type: integer
+ *                     emoji:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Вы уже поставили эту реакцию
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Неавторизован
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Комментарий или реакция не найдена
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Внутренняя ошибка сервера
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.post('/comment/:commentId', authenticateToken, validate(reactionSchemas.create), async (req, res) => {
   try {
     const commentId = req.params.commentId;
@@ -346,17 +486,26 @@ router.post('/comment/:commentId', authenticateToken, validate(reactionSchemas.c
       return res.status(404).json({ message: 'Реакция не найдена' });
     }
     
-    // Проверяем, нет ли уже такой реакции от этого пользователя
+    // Проверяем, есть ли уже реакция от этого пользователя на этот комментарий
     const existingReaction = await db.query(
-      'SELECT id FROM comment_reactions WHERE comment_id = $1 AND user_id = $2 AND reaction_id = $3',
-      [commentId, userId, reaction_id]
+      'SELECT id, reaction_id FROM comment_reactions WHERE comment_id = $1 AND user_id = $2',
+      [commentId, userId]
     );
     
-    if (existingReaction.rows.length > 0) {
+    // Если пользователь уже поставил эту же реакцию, возвращаем ошибку
+    if (existingReaction.rows.length > 0 && existingReaction.rows[0].reaction_id == reaction_id) {
       return res.status(400).json({ message: 'Вы уже поставили эту реакцию' });
     }
     
-    // Добавляем реакцию
+    // Если есть другая реакция от этого пользователя, удаляем её
+    if (existingReaction.rows.length > 0) {
+      await db.query(
+        'DELETE FROM comment_reactions WHERE comment_id = $1 AND user_id = $2',
+        [commentId, userId]
+      );
+    }
+    
+    // Добавляем новую реакцию
     const insertQuery = `
       INSERT INTO comment_reactions (comment_id, user_id, reaction_id)
       VALUES ($1, $2, $3)
@@ -367,7 +516,7 @@ router.post('/comment/:commentId', authenticateToken, validate(reactionSchemas.c
     const reaction = reactionExists.rows[0];
     
     res.status(201).json({
-      message: 'Реакция успешно добавлена',
+      message: existingReaction.rows.length > 0 ? 'Реакция успешно изменена' : 'Реакция успешно добавлена',
       reaction: {
         id: result.rows[0].id,
         comment_id: parseInt(commentId),
@@ -385,11 +534,61 @@ router.post('/comment/:commentId', authenticateToken, validate(reactionSchemas.c
   }
 });
 
-// Удаление реакции с комментария
+/**
+ * @swagger
+ * /api/reactions/comment/{commentId}:
+ *   delete:
+ *     summary: Удаление реакции к комментарию
+ *     description: Пользователь может иметь только одну реакцию на комментарий. При установке новой реакции предыдущая автоматически удаляется.
+ *     tags: [Reactions]
+ *     security:
+ *       - authorization: []
+ *     parameters:
+ *       - in: path
+ *         name: articleId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID статьи
+ *     responses:
+ *       201:
+ *         description: Реакция успешно добавлена или изменена
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Реакция успешно добавлена"
+ *       400:
+ *         description: Вы уже поставили эту реакцию
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Неавторизован
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Статья или реакция не найдена
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Внутренняя ошибка сервера
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.delete('/comment/:commentId', authenticateToken, validate(reactionSchemas.create), async (req, res) => {
   try {
     const commentId = req.params.commentId;
-    const { reaction_id } = req.body;
     const userId = req.user.id;
     
     // Проверяем, существует ли комментарий
@@ -401,11 +600,11 @@ router.delete('/comment/:commentId', authenticateToken, validate(reactionSchemas
     // Удаляем реакцию
     const deleteQuery = `
       DELETE FROM comment_reactions 
-      WHERE comment_id = $1 AND user_id = $2 AND reaction_id = $3
+      WHERE comment_id = $1 AND user_id = $2
       RETURNING id
     `;
     
-    const result = await db.query(deleteQuery, [commentId, userId, reaction_id]);
+    const result = await db.query(deleteQuery, [commentId, userId]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Реакция не найдена' });
